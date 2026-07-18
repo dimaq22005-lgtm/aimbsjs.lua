@@ -1,10 +1,8 @@
 --[[
-    Heli Wars Premium Script v3.2 - MOBILE FLY
+    Heli Wars Premium Script v3.3 - MOBILE FLY FIXED
     Delta Executor (Android/iOS)
-    Fly управляется джойстиком на экране!
 --]]
 
---// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -12,13 +10,10 @@ local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
-local TweenService = game:GetService("TweenService")
 
---// Настройки
 local Settings = {
     SilentAimEnabled = false,
     TriggerBotEnabled = false,
-    AimbotEnabled = false,
     ESPEnabled = false,
     FlyEnabled = false,
     FlySpeed = 30,
@@ -28,7 +23,6 @@ local Settings = {
     AntiAFKEnabled = true
 }
 
---// Уведомления
 local function Notify(title, message, duration)
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -39,12 +33,11 @@ local function Notify(title, message, duration)
     end)
 end
 
---// GUI
+-- GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "HeliWarsMobile"
 ScreenGui.Parent = game:GetService("CoreGui")
 
--- Главное меню
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 300, 0, 400)
 MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
@@ -66,7 +59,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Heli Wars | MOBILE"
+Title.Text = "Heli Wars MOBILE"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
@@ -84,7 +77,6 @@ HideButton.TextSize = 18
 HideButton.Font = Enum.Font.GothamBold
 HideButton.Parent = TopBar
 
--- Кнопки функций
 local function CreateButton(text, yPos, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, 40)
@@ -112,16 +104,28 @@ local function CreateButton(text, yPos, callback)
     return btn
 end
 
-CreateButton("Silent Aim [OFF]", 40, function(v) Settings.SilentAimEnabled = v; Notify("Silent Aim", v and "ON" or "OFF") end)
-CreateButton("Trigger Bot [OFF]", 85, function(v) Settings.TriggerBotEnabled = v; Notify("Trigger Bot", v and "ON" or "OFF") end)
-CreateButton("Aimbot [OFF]", 130, function(v) Settings.AimbotEnabled = v; Notify("Aimbot", v and "ON" or "OFF") end)
-CreateButton("ESP [OFF]", 175, function(v) Settings.ESPEnabled = v; Notify("ESP", v and "ON" or "OFF") end)
-CreateButton("FLY (джойстик) [OFF]", 220, function(v) Settings.FlyEnabled = v; FlyToggle(v); Notify("Fly", v and "ON (экранный джойстик)" or "OFF") end)
-CreateButton("Noclip [OFF]", 265, function(v) Settings.NoclipEnabled = v; Notify("Noclip", v and "ON" or "OFF") end)
-CreateButton("Speed Hack [OFF]", 310, function(v) Settings.SpeedHackEnabled = v; Notify("Speed Hack", v and "ON" or "OFF") end)
-CreateButton("Auto Farm [OFF]", 355, function(v) Settings.AutoFarmEnabled = v; Notify("Auto Farm", v and "ON" or "OFF") end)
+CreateButton("Silent Aim [OFF]", 40, function(v) Settings.SilentAimEnabled = v end)
+CreateButton("Trigger Bot [OFF]", 85, function(v) Settings.TriggerBotEnabled = v end)
+CreateButton("ESP [OFF]", 130, function(v) Settings.ESPEnabled = v end)
+CreateButton("FLY (джойстик) [OFF]", 175, function(v)
+    Settings.FlyEnabled = v
+    FlyJoystick.Visible = v
+    FlyUpButton.Visible = v
+    FlyDownButton.Visible = v
+    if not v then
+        if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
+        if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
+        if LocalPlayer.Character then
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.PlatformStand = false end
+        end
+    end
+end)
+CreateButton("Noclip [OFF]", 220, function(v) Settings.NoclipEnabled = v end)
+CreateButton("Speed Hack [OFF]", 265, function(v) Settings.SpeedHackEnabled = v end)
+CreateButton("Auto Farm [OFF]", 310, function(v) Settings.AutoFarmEnabled = v end)
 
--- Перетаскивание меню
+-- Перетаскивание
 local dragging = false
 local dragStart, startPos
 
@@ -144,7 +148,6 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Hide/Show кнопка
 local minimized = false
 HideButton.MouseButton1Click:Connect(function()
     minimized = not minimized
@@ -156,12 +159,10 @@ HideButton.MouseButton1Click:Connect(function()
     MainFrame.Size = minimized and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 400)
 end)
 
--- =============================================
--- 📱 МОБИЛЬНЫЙ FLY ДЖОЙСТИК
--- =============================================
+-- FLY ДЖОЙСТИК
 local FlyJoystick = Instance.new("Frame")
 FlyJoystick.Size = UDim2.new(0, 150, 0, 150)
-FlyJoystick.Position = UDim2.new(0.15, 0, 0.7, 0)
+FlyJoystick.Position = UDim2.new(0.1, 0, 0.65, 0)
 FlyJoystick.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 FlyJoystick.BackgroundTransparency = 0.85
 FlyJoystick.BorderSizePixel = 0
@@ -184,73 +185,88 @@ local FlyStickCorner = Instance.new("UICorner")
 FlyStickCorner.CornerRadius = UDim.new(1, 0)
 FlyStickCorner.Parent = FlyStick
 
--- Надпись на джойстике
-local FlyLabel = Instance.new("TextLabel")
-FlyLabel.Size = UDim2.new(1, 0, 0, 20)
-FlyLabel.Position = UDim2.new(0, 0, 0, -25)
-FlyLabel.BackgroundTransparency = 1
-FlyLabel.Text = "FLY"
-FlyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlyLabel.TextSize = 14
-FlyLabel.Font = Enum.Font.GothamBold
-FlyLabel.Parent = FlyJoystick
+local FlyUpButton = Instance.new("TextButton")
+FlyUpButton.Size = UDim2.new(0, 50, 0, 50)
+FlyUpButton.Position = UDim2.new(0.3, 0, 0.6, 0)
+FlyUpButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+FlyUpButton.BackgroundTransparency = 0.5
+FlyUpButton.BorderSizePixel = 0
+FlyUpButton.Text = "UP"
+FlyUpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyUpButton.TextSize = 14
+FlyUpButton.Font = Enum.Font.GothamBold
+FlyUpButton.Visible = false
+FlyUpButton.Parent = ScreenGui
 
--- Переменные джойстика
+local FlyUpCorner = Instance.new("UICorner")
+FlyUpCorner.CornerRadius = UDim.new(1, 0)
+FlyUpCorner.Parent = FlyUpButton
+
+local FlyDownButton = Instance.new("TextButton")
+FlyDownButton.Size = UDim2.new(0, 50, 0, 50)
+FlyDownButton.Position = UDim2.new(0.3, 0, 0.77, 0)
+FlyDownButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+FlyDownButton.BackgroundTransparency = 0.5
+FlyDownButton.BorderSizePixel = 0
+FlyDownButton.Text = "DN"
+FlyDownButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyDownButton.TextSize = 14
+FlyDownButton.Font = Enum.Font.GothamBold
+FlyDownButton.Visible = false
+FlyDownButton.Parent = ScreenGui
+
+local FlyDownCorner = Instance.new("UICorner")
+FlyDownCorner.CornerRadius = UDim.new(1, 0)
+FlyDownCorner.Parent = FlyDownButton
+
+-- Переменные Fly
 local flyInputActive = false
-local flyInputConnection = nil
-local flyMoveConnection = nil
+local flyUpActive = false
+local flyDownActive = false
 local flyBodyGyro = nil
 local flyBodyVelocity = nil
 
-local function FlyToggle(enabled)
-    Settings.FlyEnabled = enabled
-    FlyJoystick.Visible = enabled
-    
-    if not enabled then
-        if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
-        if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
-        if flyInputConnection then flyInputConnection:Disconnect(); flyInputConnection = nil end
-        if flyMoveConnection then flyMoveConnection:Disconnect(); flyMoveConnection = nil end
-        
-        if LocalPlayer.Character then
-            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum.PlatformStand = false end
-        end
-    else
-        -- Активируем управление джойстиком
-        flyInputConnection = FlyJoystick.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                flyInputActive = true
-            end
-        end)
-        
-        FlyJoystick.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                flyInputActive = false
-                FlyStick:TweenPosition(UDim2.new(0.5, -30, 0.5, -30), "Out", "Sine", 0.1)
-            end
-        end)
-        
-        flyMoveConnection = FlyJoystick.InputChanged:Connect(function(input)
-            if flyInputActive and input.UserInputType == Enum.UserInputType.Touch then
-                local joystickCenter = FlyJoystick.AbsolutePosition + FlyJoystick.AbsoluteSize / 2
-                local touchPos = input.Position
-                local delta = touchPos - joystickCenter
-                local maxRadius = FlyJoystick.AbsoluteSize.X / 2 - FlyStick.AbsoluteSize.X / 2
-                
-                if delta.Magnitude > maxRadius then
-                    delta = delta.Unit * maxRadius
-                end
-                
-                FlyStick.Position = UDim2.new(0, delta.X + FlyJoystick.AbsoluteSize.X/2 - FlyStick.AbsoluteSize.X/2, 0, delta.Y + FlyJoystick.AbsoluteSize.Y/2 - FlyStick.AbsoluteSize.Y/2)
-            end
-        end)
+FlyJoystick.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        flyInputActive = true
     end
-end
+end)
 
--- Fly система с джойстиком
+FlyJoystick.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        flyInputActive = false
+        FlyStick:TweenPosition(UDim2.new(0.5, -30, 0.5, -30), "Out", "Sine", 0.1)
+    end
+end)
+
+FlyJoystick.InputChanged:Connect(function(input)
+    if flyInputActive and input.UserInputType == Enum.UserInputType.Touch then
+        local joystickCenter = FlyJoystick.AbsolutePosition + FlyJoystick.AbsoluteSize / 2
+        local touchPos = input.Position
+        local delta = touchPos - joystickCenter
+        local maxRadius = FlyJoystick.AbsoluteSize.X / 2 - FlyStick.AbsoluteSize.X / 2
+        
+        if delta.Magnitude > maxRadius then
+            delta = delta.Unit * maxRadius
+        end
+        
+        FlyStick.Position = UDim2.new(0, delta.X + FlyJoystick.AbsoluteSize.X/2 - FlyStick.AbsoluteSize.X/2, 0, delta.Y + FlyJoystick.AbsoluteSize.Y/2 - FlyStick.AbsoluteSize.Y/2)
+    end
+end)
+
+FlyUpButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then flyUpActive = true end
+end)
+FlyUpButton.InputEnded:Connect(function() flyUpActive = false end)
+
+FlyDownButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then flyDownActive = true end
+end)
+FlyDownButton.InputEnded:Connect(function() flyDownActive = false end)
+
+-- Fly система
 RunService.Heartbeat:Connect(function()
-    if Settings.FlyEnabled and LocalPlayer.Character and flyInputActive then
+    if Settings.FlyEnabled and LocalPlayer.Character then
         local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if rootPart then
             if not flyBodyGyro then
@@ -266,122 +282,36 @@ RunService.Heartbeat:Connect(function()
             
             flyBodyGyro.CFrame = Camera.CFrame
             
-            -- Направление от центра джойстика
-            local joystickCenter = FlyJoystick.AbsolutePosition + FlyJoystick.AbsoluteSize / 2
-            local stickCenter = FlyStick.AbsolutePosition + FlyStick.AbsoluteSize / 2
-            local delta = stickCenter - joystickCenter
-            local maxRadius = FlyJoystick.AbsoluteSize.X / 2
-            
             local moveDirection = Vector3.zero
-            if delta.Magnitude > 5 then
-                local normalizedDelta = delta / maxRadius
-                moveDirection = Camera.CFrame.RightVector * normalizedDelta.X + Camera.CFrame.LookVector * (-normalizedDelta.Y)
+            
+            if flyInputActive then
+                local joystickCenter = FlyJoystick.AbsolutePosition + FlyJoystick.AbsoluteSize / 2
+                local stickCenter = FlyStick.AbsolutePosition + FlyStick.AbsoluteSize / 2
+                local delta = stickCenter - joystickCenter
+                local maxRadius = FlyJoystick.AbsoluteSize.X / 2
+                
+                if delta.Magnitude > 5 then
+                    local normalizedDelta = delta / maxRadius
+                    moveDirection = Camera.CFrame.RightVector * normalizedDelta.X + Camera.CFrame.LookVector * (-normalizedDelta.Y)
+                end
             end
+            
+            if flyUpActive then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
+            if flyDownActive then moveDirection = moveDirection + Vector3.new(0, -1, 0) end
             
             flyBodyVelocity.Velocity = moveDirection.Magnitude > 0 and moveDirection.Unit * Settings.FlySpeed or Vector3.zero
             
             local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if humanoid then humanoid.PlatformStand = true end
         end
-    elseif Settings.FlyEnabled and LocalPlayer.Character and not flyInputActive then
-        if flyBodyVelocity then
-            flyBodyVelocity.Velocity = Vector3.zero
-        end
-    elseif not Settings.FlyEnabled then
+    else
         if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
         if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
     end
 end)
 
--- Кнопки вверх/вниз для Fly (по бокам от джойстика)
-local FlyUpButton = Instance.new("TextButton")
-FlyUpButton.Size = UDim2.new(0, 50, 0, 50)
-FlyUpButton.Position = UDim2.new(0.35, 0, 0.65, 0)
-FlyUpButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-FlyUpButton.BackgroundTransparency = 0.5
-FlyUpButton.BorderSizePixel = 0
-FlyUpButton.Text = "⬆"
-FlyUpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlyUpButton.TextSize = 24
-FlyUpButton.Font = Enum.Font.GothamBold
-FlyUpButton.Visible = false
-FlyUpButton.Parent = ScreenGui
-
-local FlyUpCorner = Instance.new("UICorner")
-FlyUpCorner.CornerRadius = UDim.new(1, 0)
-FlyUpCorner.Parent = FlyUpButton
-
-local FlyDownButton = Instance.new("TextButton")
-FlyDownButton.Size = UDim2.new(0, 50, 0, 50)
-FlyDownButton.Position = UDim2.new(0.35, 0, 0.8, 0)
-FlyDownButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-FlyDownButton.BackgroundTransparency = 0.5
-FlyDownButton.BorderSizePixel = 0
-FlyDownButton.Text = "⬇"
-FlyDownButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlyDownButton.TextSize = 24
-FlyDownButton.Font = Enum.Font.GothamBold
-FlyDownButton.Visible = false
-FlyDownButton.Parent = ScreenGui
-
-local FlyDownCorner = Instance.new("UICorner")
-FlyDownCorner.CornerRadius = UDim.new(1, 0)
-FlyDownCorner.Parent = FlyDownButton
-
--- Подключаем кнопки вверх/вниз к Fly системе
-local flyUpActive = false
-local flyDownActive = false
-
-FlyUpButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        flyUpActive = true
-    end
-end)
-FlyUpButton.InputEnded:Connect(function(input)
-    flyUpActive = false
-end)
-
-FlyDownButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        flyDownActive = true
-    end
-end)
-FlyDownButton.InputEnded:Connect(function(input)
-    flyDownActive = false
-end)
-
--- Обновляем видимость кнопок вверх/вниз вместе с джойстиком
-local function UpdateFlyButtons()
-    FlyUpButton.Visible = Settings.FlyEnabled
-    FlyDownButton.Visible = Settings.FlyEnabled
-end
-
--- Переопределяем FlyToggle для включения кнопок
-local oldFlyToggle = FlyToggle
-FlyToggle = function(enabled)
-    oldFlyToggle(enabled)
-    UpdateFlyButtons()
-end
-
--- Добавляем вертикальное движение в Fly систему
-local oldHeartbeat = RunService.Heartbeat
-RunService.Heartbeat:Connect(function()
-    if Settings.FlyEnabled and LocalPlayer.Character and flyBodyVelocity then
-        local verticalMove = 0
-        if flyUpActive then verticalMove = verticalMove + 1 end
-        if flyDownActive then verticalMove = verticalMove - 1 end
-        
-        if verticalMove ~= 0 then
-            flyBodyVelocity.Velocity = flyBodyVelocity.Velocity + Vector3.new(0, verticalMove * Settings.FlySpeed, 0)
-        end
-    end
-end)
-
--- =============================================
--- SILENT AIM
--- =============================================
-local oldIndex = nil
-oldIndex = hookmetamethod(game, "__index", function(self, key)
+-- Silent Aim
+local oldIndex = hookmetamethod(game, "__index", function(self, key)
     if self == Mouse and key == "Hit" and Settings.SilentAimEnabled then
         local target = nil
         local closestDist = 200
@@ -389,7 +319,6 @@ oldIndex = hookmetamethod(game, "__index", function(self, key)
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 if player.Team == LocalPlayer.Team then continue end
-                
                 local head = player.Character:FindFirstChild("Head")
                 if head then
                     local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
@@ -404,16 +333,12 @@ oldIndex = hookmetamethod(game, "__index", function(self, key)
             end
         end
         
-        if target then
-            return target
-        end
+        if target then return target end
     end
     return oldIndex(self, key)
 end)
 
--- =============================================
--- TRIGGER BOT
--- =============================================
+-- Trigger Bot
 RunService.Heartbeat:Connect(function()
     if Settings.TriggerBotEnabled and Settings.SilentAimEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
@@ -423,10 +348,7 @@ RunService.Heartbeat:Connect(function()
                     local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
                     if onScreen then
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - (Camera.ViewportSize / 2)).Magnitude
-                        if dist < 200 then
-                            mouse1press()
-                            break
-                        end
+                        if dist < 200 then mouse1press(); break end
                     end
                 end
             end
@@ -434,22 +356,16 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- =============================================
--- NOCLIP
--- =============================================
+-- Noclip
 RunService.Stepped:Connect(function()
     if Settings.NoclipEnabled and LocalPlayer.Character then
         for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
 end)
 
--- =============================================
--- SPEED HACK
--- =============================================
+-- Speed Hack
 RunService.Heartbeat:Connect(function()
     if LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -459,9 +375,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- =============================================
--- ANTI-AFK
--- =============================================
+-- Anti-AFK
 local VirtualUser = game:GetService("VirtualUser")
 RunService.Heartbeat:Connect(function()
     if Settings.AntiAFKEnabled then
@@ -472,9 +386,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- =============================================
 -- ESP
--- =============================================
 RunService.RenderStepped:Connect(function()
     if not Settings.ESPEnabled then return end
     
@@ -487,20 +399,17 @@ RunService.RenderStepped:Connect(function()
         
         if not head or not humanoid or humanoid.Health <= 0 or not rootPart then continue end
         
-        local headPos = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.5, 0))
-        local rootPos = Camera:WorldToScreenPoint(rootPart.Position)
+        local headPos, headOn = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.5, 0))
+        local rootPos, rootOn = Camera:WorldToScreenPoint(rootPart.Position)
         
-        if not rootPos.Z then continue end
+        if not rootOn then continue end
         
-        local isTeam = player.Team == LocalPlayer.Team
-        local color = isTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-        
-        local boxHeight = math.abs(rootPos.Y - headPos.Y)
-        local boxWidth = boxHeight * 0.4
+        local color = player.Team == LocalPlayer.Team and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
         
         local box = Instance.new("Frame")
-        box.Size = UDim2.new(0, boxWidth, 0, boxHeight)
-        box.Position = UDim2.new(0, headPos.X - boxWidth/2, 0, headPos.Y)
+        local boxHeight = math.abs(rootPos.Y - headPos.Y)
+        box.Size = UDim2.new(0, boxHeight * 0.4, 0, boxHeight)
+        box.Position = UDim2.new(0, headPos.X - boxHeight * 0.2, 0, headPos.Y)
         box.BackgroundTransparency = 0.8
         box.BorderSizePixel = 2
         box.BorderColor3 = color
@@ -520,9 +429,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- =============================================
--- AUTO FARM
--- =============================================
+-- Auto Farm
 RunService.Heartbeat:Connect(function()
     if not Settings.AutoFarmEnabled or not LocalPlayer.Character then return end
     
@@ -532,4 +439,23 @@ RunService.Heartbeat:Connect(function()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Team ~= LocalPlayer.Team then
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-            local localRoot = LocalPlayer.Character:FindFirstChild("H
+            local localRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
+            if rootPart and localRoot then
+                local dist = (rootPart.Position - localRoot.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearestEnemy = player
+                end
+            end
+        end
+    end
+    
+    if nearestEnemy then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then humanoid:MoveTo(nearestEnemy.Character.HumanoidRootPart.Position) end
+    end
+end)
+
+Notify("Heli Wars MOBILE v3.3", "Загружено!", 5)
+Notify("Fly", "Джойстик + UP/DN кнопки", 5)
