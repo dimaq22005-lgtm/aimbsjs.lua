@@ -1,10 +1,9 @@
---[[ Heli Wars SILENT AIM v11 ]]
+--[[ Heli Wars SILENT AIM v12 - NO FREEZE ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 
 local Teams = {"Desert Team", "Green Team", "Jungle Team"}
 
@@ -39,7 +38,7 @@ Instance.new("UICorner",Top).CornerRadius = UDim.new(0,10)
 local Title = Instance.new("TextLabel",Top)
 Title.Size = UDim2.new(1,0,1,0)
 Title.BackgroundTransparency = 1
-Title.Text = "🎯 Silent Aim v11"
+Title.Text = "🎯 Silent Aim v12"
 Title.TextColor3 = Color3.fromRGB(255,200,0)
 Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
@@ -77,7 +76,7 @@ local function Btn(text,cb)
     yPos = yPos + 40
 end
 
-Btn("🎯 Silent Aim",function(v) Settings.SilentAim=v FOV.Visible=v Notify("Silent Aim",v and"ON"or"OFF") end)
+Btn("🎯 Silent Aim",function(v) Settings.SilentAim=v FOV.Visible=v end)
 Btn("👻 Noclip",function(v) Settings.Noclip=v end)
 Btn("⚡ Speed Hack",function(v) Settings.SpeedHack=v end)
 
@@ -99,8 +98,6 @@ MyTeamBtn.MouseButton1Click:Connect(function()
     myIdx = myIdx%3+1
     Settings.MyTeam = Teams[myIdx]
     MyTeamBtn.Text = "My: "..Settings.MyTeam
-    local colors = {[Teams[1]]=Color3.fromRGB(210,180,140),[Teams[2]]=Color3.fromRGB(0,150,0),[Teams[3]]=Color3.fromRGB(0,100,0)}
-    MyTeamBtn.BackgroundColor3 = colors[Settings.MyTeam]
 end)
 
 -- Выбор кого убивать
@@ -121,8 +118,6 @@ TargetBtn.MouseButton1Click:Connect(function()
     targetIdx = targetIdx%3+1
     Settings.TargetTeam = Teams[targetIdx]
     TargetBtn.Text = "Target: "..Settings.TargetTeam
-    local colors = {[Teams[1]]=Color3.fromRGB(210,180,140),[Teams[2]]=Color3.fromRGB(0,150,0),[Teams[3]]=Color3.fromRGB(0,100,0)}
-    TargetBtn.BackgroundColor3 = colors[Settings.TargetTeam]
 end)
 
 -- Перетаскивание
@@ -131,41 +126,32 @@ Top.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseB
 UserInputService.InputEnded:Connect(function() drag=false end)
 UserInputService.InputChanged:Connect(function(i) if drag and(i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch)then Main.Position=UDim2.new(sG.X.Scale,sG.X.Offset+i.Position.X-sP.X,sG.Y.Scale,sG.Y.Offset+i.Position.Y-sP.Y) end end)
 
--- ОПРЕДЕЛЕНИЕ КОМАНДЫ ИГРОКА
+-- ОПРЕДЕЛЕНИЕ КОМАНДЫ
 local function GetPlayerTeam(player)
     local char = player.Character
     if not char then return nil end
     
-    -- Способ 1: Team Color
     if player.Team then
         local tc = player.Team.TeamColor.Color
-        if tc == Color3.fromRGB(210,180,140) or tc == Color3.fromRGB(194,178,128) then return "Desert Team" end
-        if tc == Color3.fromRGB(0,255,0) or tc == Color3.fromRGB(50,200,50) then return "Green Team" end
-        if tc == Color3.fromRGB(0,100,0) or tc == Color3.fromRGB(34,139,34) then return "Jungle Team" end
+        if tc.r > 0.7 and tc.g > 0.6 and tc.b < 0.5 then return "Desert Team" end
+        if tc.g > 0.8 and tc.r < 0.5 then return "Green Team" end
+        if tc.g < 0.5 and tc.r < 0.3 and tc.b < 0.3 then return "Jungle Team" end
     end
     
-    -- Способ 2: Цвет частей тела
     for _,part in ipairs(char:GetChildren()) do
         if part:IsA("BasePart") and part.BrickColor then
-            local name = part.BrickColor.Name
             local color = part.BrickColor.Color
-            
-            if name:find("Sand") or name:find("Beige") or color == Color3.fromRGB(194,178,128) then return "Desert Team" end
-            if name:find("Bright green") or name:find("Lime") or color == Color3.fromRGB(0,255,0) then return "Green Team" end
-            if name:find("Dark green") or name:find("Forest") or color == Color3.fromRGB(0,100,0) then return "Jungle Team" end
+            if color.r > 0.7 and color.g > 0.6 then return "Desert Team" end
+            if color.g > 0.8 then return "Green Team" end
+            if color.g < 0.5 and color.r < 0.3 then return "Jungle Team" end
         end
     end
-    
-    -- Способ 3: По имени (если в имени есть подсказка)
-    if char.Name:find("Desert") then return "Desert Team" end
-    if char.Name:find("Green") then return "Green Team" end
-    if char.Name:find("Jungle") then return "Jungle Team" end
     
     return nil
 end
 
--- ПОЛУЧЕНИЕ ЦЕЛИ ДЛЯ SILENT AIM
-local function GetSilentTarget()
+-- ПОЛУЧЕНИЕ ЦЕЛИ
+local function GetTarget()
     local center = Camera.ViewportSize / 2
     local best = nil
     local bestDist = Settings.FOV
@@ -175,12 +161,8 @@ local function GetSilentTarget()
         
         local team = GetPlayerTeam(player)
         if not team then continue end
-        
-        -- Пропускаем свою команду
         if team == Settings.MyTeam then continue end
-        
-        -- Если выбрана конкретная команда для таргета
-        if Settings.TargetTeam ~= "All" and team ~= Settings.TargetTeam then continue end
+        if team ~= Settings.TargetTeam then continue end
         
         local hum = player.Character:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then continue end
@@ -194,34 +176,39 @@ local function GetSilentTarget()
         local dist = (Vector2.new(pos.X,pos.Y) - center).Magnitude
         if dist < bestDist then
             bestDist = dist
-            best = head.Position
+            best = head
         end
     end
     
     return best
 end
 
--- SILENT AIM
-local oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if self == Mouse and key == "Hit" and Settings.SilentAim then
-        local target = GetSilentTarget()
-        if target then
-            return target
-        end
-    end
-    return oldIndex(self, key)
-end)
+-- SILENT AIM (без hookmetamethod - через принудительное наведение)
+local UserInput = game:GetService("VirtualInputManager")
+local RunS = game:GetService("RunService")
 
--- Обновление FOV
-RunService.RenderStepped:Connect(function()
-    if Settings.SilentAim then
-        FOV.Size = UDim2.new(0,Settings.FOV*2,0,Settings.FOV*2)
-        FOV.Position = UDim2.new(0.5,-Settings.FOV,0.5,-Settings.FOV)
-    end
+RunS.RenderStepped:Connect(function()
+    if not Settings.SilentAim then return end
+    
+    -- Обновляем FOV
+    FOV.Size = UDim2.new(0,Settings.FOV*2,0,Settings.FOV*2)
+    FOV.Position = UDim2.new(0.5,-Settings.FOV,0.5,-Settings.FOV)
+    
+    local target = GetTarget()
+    if not target then return end
+    
+    local pos = Camera:WorldToScreenPoint(target.Position)
+    local center = Camera.ViewportSize / 2
+    
+    -- Мгновенное наведение на цель
+    local moveX = pos.X - center.X
+    local moveY = pos.Y - center.Y
+    
+    UserInput:SendMouseMoveEvent(Vector2.new(moveX, moveY), false)
 end)
 
 -- NOCLIP
-RunService.Stepped:Connect(function()
+RunS.Stepped:Connect(function()
     if not Settings.Noclip or not LocalPlayer.Character then return end
     for _,p in ipairs(LocalPlayer.Character:GetDescendants()) do
         if p:IsA("BasePart") then p.CanCollide=false end
@@ -229,7 +216,7 @@ RunService.Stepped:Connect(function()
 end)
 
 -- SPEED HACK
-RunService.Heartbeat:Connect(function()
+RunS.Heartbeat:Connect(function()
     if LocalPlayer.Character then
         local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if h then h.WalkSpeed = Settings.SpeedHack and 50 or 16 end
@@ -238,9 +225,8 @@ end)
 
 -- ANTI-AFK
 local VU = game:GetService("VirtualUser")
-RunService.Heartbeat:Connect(function()
+RunS.Heartbeat:Connect(function()
     pcall(function() VU:CaptureController() VU:ClickButton2(Vector2.new()) end)
 end)
 
-Notify("🎯 Silent Aim v11","Выбери команды и стреляй!",5)
-Notify("Как работает","Стреляешь куда угодно - пули в цель!",5)
+Notify("🎯 Silent Aim v12","Без зависаний!",5)
